@@ -9,6 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -25,6 +28,14 @@ class Release:
     version: str
     download_url: str
     sha256: str
+
+
+@dataclass(frozen=True)
+class GitUpdateResult:
+    """Outcome of one operator-triggered GitHub update attempt."""
+
+    updated: bool
+    details: str
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -125,3 +136,55 @@ def stage_release(release: Release, staging_dir: Path) -> Path:
         return destination
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def update_from_git(root: Path) -> GitUpdateResult:
+    """Fast-forward local source from its configured GitHub remote and install requirements.
+
+    This never touches data, credentials, backups, logs, or dashboard preferences:
+    Git only changes tracked source files, while pip uses the Python environment
+    that launched the dashboard.  The caller must be an operator who explicitly
+    requested the update.
+    """
+    root = Path(root).resolve()
+    git = shutil.which('git')
+    if not git:
+        raise RuntimeError('Git is not installed or is not available on PATH.')
+    if not (root / '.git').is_dir():
+        raise RuntimeError('This installation is not a Git clone. Clone the private repository first.')
+
+    def run(*args: str) -> str:
+        result = subprocess.run(
+            [git, *args], cwd=root, text=True, capture_output=True, timeout=90,
+        )
+        if result.returncode:
+            message = (result.stderr or result.stdout or 'Git command failed.').strip()
+            raise RuntimeError(message)
+        return (result.stdout or result.stderr).strip()
+
+    if run('status', '--porcelain'):
+        raise RuntimeError('Local source changes are present. Commit or discard them before updating.')
+    run('remote', 'get-url', 'origin')
+    run('fetch', '--prune', 'origin')
+    ahead_behind = run('rev-list', '--left-right', '--count', 'HEAD...@{u}').split()
+    if len(ahead_behind) != 2 or not all(part.isdecimal() for part in ahead_behind):
+        raise RuntimeError('Could not compare the local source with its GitHub branch.')
+    ahead, behind = (int(part) for part in ahead_behind)
+    if not ahead and not behind:
+        return GitUpdateResult(False, 'Already up to date. Dependencies were not changed.')
+    if ahead and not behind:
+        raise RuntimeError('Local source is ahead of GitHub. Push local changes before updating.')
+    if ahead and behind:
+        raise RuntimeError('Local and GitHub source have diverged. Resolve the Git conflict before updating.')
+    run('merge', '--ff-only', '@{u}')
+
+    requirements = root / 'requirements.txt'
+    if requirements.is_file():
+        result = subprocess.run(
+            [sys.executable, '-m', 'pip', 'install', '-r', str(requirements)],
+            cwd=root, text=True, capture_output=True, timeout=300,
+        )
+        if result.returncode:
+            message = (result.stderr or result.stdout or 'Dependency installation failed.').strip()
+            raise RuntimeError(f'GitHub source updated, but dependency installation failed: {message}')
+    return GitUpdateResult(True, 'GitHub source and required packages were updated. Restart the bot to use the new code.')

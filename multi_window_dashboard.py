@@ -21,7 +21,7 @@ from connection_health import display_status
 from tkinter import messagebox, filedialog
 from analytics_reports import load_samples, summarize, export_csv, RANGE_SECONDS
 from backup_center import guild_ids, backup_folders, validate, create_manual, restore_offline, delete_backup
-from update_manager import check_for_update, current_version
+from update_manager import check_for_update, current_version, update_from_git
 import shutil
 import time
 
@@ -388,14 +388,14 @@ class Dashboard:
         self.build_updates_tab(updates_tab)
 
     def build_updates_tab(self, tab):
-        """Create the local-only update view without installing anything."""
+        """Create operator-controlled update controls."""
         tk.Label(tab, text="UPDATES", bg=BG, fg=TEXT,
                  font=("Segoe UI", self.font_size + 2, "bold")).pack(anchor="w", padx=16, pady=(18, 7))
         tk.Label(tab, text=f"Installed version: {current_version(ROOT)}", bg=BG, fg=TEXT,
                  font=("Segoe UI", 11)).pack(anchor="w", padx=16, pady=(0, 8))
         self.update_help = tk.Label(
             tab,
-            text="Checks the configured GitHub release manifest. Downloads and installation remain disabled until the update source is configured and verified.",
+            text="Update this Git clone from its configured GitHub remote. The action only changes tracked source files, then installs requirements such as davey. Tokens, data, backups, logs, and preferences remain local.",
             bg=BG, fg=MUTED, justify="left", anchor="w", wraplength=480,
         )
         self.update_help.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
@@ -403,7 +403,8 @@ class Dashboard:
                                       font=("Segoe UI", 11, "bold"), justify="left", anchor="w", wraplength=480)
         self.update_status.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
         self.accent_labels.append(self.update_status)
-        modern_button(tab, "Check for Updates", self.check_for_updates, "accent", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Update from GitHub", self.update_from_github, "accent", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Check Release Feed", self.check_for_updates, "normal", anchor="w", padx=16, pady=6)
         tab.bind("<Configure>", self.resize_update_text, add="+")
 
     def resize_update_text(self, event):
@@ -429,6 +430,23 @@ class Dashboard:
             self.update_status.configure(text="You are running the latest available version.")
         else:
             self.update_status.configure(text=f"Version {release.version} is available and ready to be staged after confirmation.")
+
+    def update_from_github(self):
+        if not messagebox.askyesno(
+            "Update from GitHub",
+            "Download the latest tracked code from this installation's configured GitHub remote and install its Python requirements?\n\n"
+            "Your bot keeps running until you choose Restart Bot. Local token, data, backups, logs, and preferences are not changed.",
+            parent=self.root,
+        ):
+            return
+        self.update_status.configure(text="Updating source and requirements from GitHub…")
+        self.root.update_idletasks()
+        try:
+            result = update_from_git(ROOT)
+        except (OSError, RuntimeError) as exc:
+            self.update_status.configure(text=f"GitHub update failed: {exc}")
+            return
+        self.update_status.configure(text=result.details)
 
     def refresh_now(self):
         """Refresh all guild data immediately without changing the polling schedule."""
