@@ -1,0 +1,23 @@
+# Local secrets and customer-specific Discord configuration
+local_credentials.json
+
+# Runtime data and generated operational files
+.venv/
+data/
+backups/
+logs/
+runtime/
+.bot_supervisor_status.json
+.bot_supervisor.lock
+.dashboard_preferences.json
+.dashboard_font.json
+.upgrade_code_backups/
+.test-temp/
+updates/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+
+# Locally packaged builds are distributed separately from source control
+*.zip

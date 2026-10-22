@@ -1,0 +1,17 @@
+v4.0.3
+- Removed the optional Dota 2 test integration and all OpenDota network access.
+- Corrected Windows setup/invite documentation and release-preflight file checks.
+- Removed unused third-party `davey` dependency from the installer requirements.
+- Gateway connection diagnostics and off-thread monitoring writes.
+v4.0.1 Windows Supervisor Status Fix
+- Retry locked status-file replacement on Windows, with unique temporary paths.
+- Prevent supervisor termination when status publishing fails.
+- Preserve previous complete status file and handle locked cleanup gracefully.
+- 3 new regression tests.
+
+v4.0.0 STABLE - Official Windows release
+- Consolidates and validates v4.0.0 RC1-RC3 reliability and upgrade improvements.
+- White and Dark dashboard themes, analytics, alerts, backups, Discord slash commands retained.
+- Updated Stable release metadata, preflight labeling and safe upgrade messages.
+- Release ZIP contains only the current release README.
+- No migration of guild data or credentials; no changes to reward calculations.
