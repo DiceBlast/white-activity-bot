@@ -1,7 +1,12 @@
+v4.0.4
+- Added an operator-confirmed Update from GitHub action in Settings > Updates.
+- The dashboard fast-forwards clean Git source only, installs requirements (including davey), and asks the operator to restart the bot.
+- Restored the optional davey package required for Discord voice encryption support.
+
 v4.0.3
 - Removed the optional Dota 2 test integration and all OpenDota network access.
 - Corrected Windows setup/invite documentation and release-preflight file checks.
-- Removed unused third-party `davey` dependency from the installer requirements.
+- The installer requirement was later restored in v4.0.4 for current Discord voice support.
 - Gateway connection diagnostics and off-thread monitoring writes.
 v4.0.1 Windows Supervisor Status Fix
 - Retry locked status-file replacement on Windows, with unique temporary paths.

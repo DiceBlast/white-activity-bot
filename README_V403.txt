@@ -1,4 +1,4 @@
-WhiteLabel Activity Bot v4.0.3
+WhiteLabel Activity Bot v4.0.4
 
 Windows package for a self-hosted Discord activity and rewards bot.
 
