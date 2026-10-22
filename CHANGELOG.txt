@@ -1,3 +1,6 @@
+v4.0.5
+- GitHub dashboard update verification build. No reward, token, database, or configuration changes.
+
 v4.0.4
 - Added an operator-confirmed Update from GitHub action in Settings > Updates.
 - The dashboard fast-forwards clean Git source only, installs requirements (including davey), and asks the operator to restart the bot.
