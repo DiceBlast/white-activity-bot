@@ -7,7 +7,7 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parent
-MODULES = ('discord', 'psutil', 'nacl', 'tzdata')
+MODULES = ('discord', 'psutil', 'nacl', 'tzdata', 'davey')
 README = 'README_V403.txt'
 REQUIRED = ('bot.py', 'bot_supervisor.py', 'supervisor_storage.py', 'multi_window_dashboard.py',
             'backup_center.py', 'backup.py', 'safe_upgrade.py', 'START_BOT.bat')
