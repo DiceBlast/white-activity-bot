@@ -22,6 +22,7 @@ from tkinter import messagebox, filedialog
 from analytics_reports import load_samples, summarize, export_csv, RANGE_SECONDS
 from backup_center import guild_ids, backup_folders, validate, create_manual, restore_offline, delete_backup
 from update_manager import check_for_update, current_version, update_from_git
+from config_manager import load_config, save_config, mark_setup_section, setup_status
 import shutil
 import time
 
@@ -801,9 +802,12 @@ class Dashboard:
         voice_page = tk.Frame(tabs, bg=BG)
         rewards_page = tk.Frame(tabs, bg=BG)
         analytics_page = tk.Frame(tabs, bg=BG)
+        setup_page = tk.Frame(tabs, bg=BG)
         tabs.add(voice_page, text='Live Voice')
         tabs.add(rewards_page, text='Rewards')
         tabs.add(analytics_page, text='Analytics')
+        tabs.add(setup_page, text='Setup')
+        self.build_guild_setup_tab(setup_page, gid)
         tk.Label(analytics_page, text='VOICE & MEMBER HISTORY', bg=BG, fg=ACCENT, font=('Segoe UI', 11, 'bold')).pack(anchor='w', padx=14, pady=(12, 3))
         analytics_toolbar = tk.Frame(analytics_page, bg=BG)
         analytics_toolbar.pack(fill='x', padx=14, pady=(4, 5))
@@ -832,6 +836,140 @@ class Dashboard:
         self.accent_labels.append(label)
         win.protocol("WM_DELETE_WINDOW", lambda: self.close_guild(gid))
         self.update_guild(gid)
+
+    def build_guild_setup_tab(self, tab, guild_id):
+        """Desktop equivalent of the Discord /setup flow for one guild."""
+        config = load_config(guild_id)
+        status = setup_status(config)
+        tk.Label(tab, text='GUILD SETUP', bg=BG, fg=TEXT,
+                 font=('Segoe UI', self.font_size + 2, 'bold')).pack(anchor='w', padx=16, pady=(14, 2))
+        tk.Label(
+            tab,
+            text='Configure this guild locally. The Discord /setup command remains available and uses the same saved settings.',
+            bg=BG, fg=MUTED, justify='left', anchor='w', wraplength=900,
+        ).pack(fill='x', padx=16, pady=(0, 8))
+        status_label = tk.Label(tab, bg=BG, fg=ACCENT, anchor='w', font=('Segoe UI', 10, 'bold'))
+        status_label.pack(fill='x', padx=16, pady=(0, 10))
+
+        form = tk.Frame(tab, bg=BG)
+        form.pack(fill='both', expand=True, padx=16, pady=(0, 8))
+        left = tk.Frame(form, bg=BG)
+        right = tk.Frame(form, bg=BG)
+        left.pack(side='left', fill='both', expand=True, padx=(0, 10))
+        right.pack(side='left', fill='both', expand=True, padx=(10, 0))
+
+        def section(parent, title):
+            box = tk.Frame(parent, bg=PANEL_DARK, highlightthickness=1, highlightbackground=BORDER)
+            box.pack(fill='x', pady=(0, 10))
+            tk.Label(box, text=title, bg=PANEL_DARK, fg=ACCENT,
+                     font=('Segoe UI', 10, 'bold')).pack(anchor='w', padx=10, pady=(8, 3))
+            return box
+
+        def entry(parent, label, value):
+            row = tk.Frame(parent, bg=PANEL_DARK)
+            row.pack(fill='x', padx=10, pady=3)
+            tk.Label(row, text=label, bg=PANEL_DARK, fg=TEXT, width=21, anchor='w').pack(side='left')
+            variable = tk.StringVar(value=str(value))
+            tk.Entry(row, textvariable=variable, bg=BG, fg=TEXT, insertbackground=TEXT,
+                     relief='flat').pack(side='left', fill='x', expand=True)
+            return variable
+
+        def toggle(parent, label, value):
+            variable = tk.BooleanVar(value=bool(value))
+            tk.Checkbutton(parent, text=label, variable=variable, bg=PANEL_DARK, fg=TEXT,
+                           activebackground=PANEL_DARK, activeforeground=TEXT,
+                           selectcolor=BG, anchor='w').pack(fill='x', padx=10, pady=2)
+            return variable
+
+        branding = section(left, 'BRANDING')
+        nickname = entry(branding, 'Bot nickname', config['branding']['bot_nickname'])
+        currency_name = entry(branding, 'Currency name', config['branding']['currency_name'])
+        currency_emoji = entry(branding, 'Currency emoji', config['branding']['currency_emoji'])
+        event_name = entry(branding, 'Event name', config['branding']['event_name'])
+
+        rewards = section(left, 'REWARDS & VOICE')
+        interval = entry(rewards, 'Interval minutes', config['rewards']['interval_minutes'])
+        points = entry(rewards, 'Points per interval', config['rewards']['points_per_interval'])
+        first_bonus = entry(rewards, 'First join bonus', config['rewards']['first_join_bonus'])
+        first_bonus_enabled = toggle(rewards, 'Enable first join bonus', config['rewards']['first_join_bonus_enabled'])
+        minimum_members = entry(rewards, 'Minimum voice members', config['voice']['minimum_members_in_channel'])
+        ignore_afk = toggle(rewards, 'Ignore AFK channel', config['voice']['ignore_afk_channel'])
+        ignore_deafened = toggle(rewards, 'Ignore deafened users', config['voice']['ignore_deafened_users'])
+
+        event = section(right, 'EVENT SCHEDULE')
+        event_enabled = toggle(event, 'Enable event multiplier', config['event']['enabled'])
+        multiplier = entry(event, 'Multiplier', config['event']['multiplier'])
+        start_day = entry(event, 'Start day', config['event']['start_day'])
+        start_time = entry(event, 'Start time (HH:MM)', config['event']['start_time'])
+        end_day = entry(event, 'End day', config['event']['end_day'])
+        end_time = entry(event, 'End time (HH:MM)', config['event']['end_time'])
+
+        channels = section(right, 'CHANNELS & ADMIN')
+        reward_channel = entry(channels, 'Reward channel ID', config['channels']['reward_channel'])
+        announcement_channel = entry(channels, 'Announcement channel ID', config['channels']['announcement_channel'])
+        admin_role = entry(channels, 'Admin role ID', config['admin_role_id'])
+        timezone = entry(channels, 'Timezone', config['timezone'])
+
+        schedule = section(right, 'WEEKLY & MONTHLY')
+        weekly_enabled = toggle(schedule, 'Enable weekly leaderboard', config['weekly_announcement']['enabled'])
+        weekly_day = entry(schedule, 'Weekly day', config['weekly_announcement']['day'])
+        weekly_time = entry(schedule, 'Weekly time (HH:MM)', config['weekly_announcement']['time'])
+        monthly_enabled = toggle(schedule, 'Enable monthly winner', config['monthly']['enabled'])
+        monthly_winners = entry(schedule, 'Monthly winners (1 or 3)', config['monthly']['winner_count'])
+
+        def refresh_status(saved=None):
+            current = setup_status(saved or load_config(guild_id))
+            missing = ', '.join(current['missing']) if current['missing'] else 'none'
+            state = 'Complete' if current['complete'] else f"{current['done']}/{current['total']} sections complete"
+            status_label.configure(text=f'Setup status: {state} · Missing: {missing}')
+
+        def save_setup():
+            try:
+                updated = load_config(guild_id)
+                updated['branding'].update({
+                    'bot_nickname': nickname.get().strip() or 'Activity Rewards',
+                    'currency_name': currency_name.get().strip() or 'Points',
+                    'currency_emoji': currency_emoji.get().strip() or '⭐',
+                    'event_name': event_name.get().strip() or 'Rush Hour',
+                })
+                updated['rewards'].update({
+                    'interval_minutes': interval.get(), 'points_per_interval': points.get(),
+                    'first_join_bonus': first_bonus.get(), 'first_join_bonus_enabled': first_bonus_enabled.get(),
+                })
+                updated['voice'].update({
+                    'minimum_members_in_channel': minimum_members.get(), 'ignore_afk_channel': ignore_afk.get(),
+                    'ignore_deafened_users': ignore_deafened.get(),
+                })
+                updated['event'].update({
+                    'enabled': event_enabled.get(), 'multiplier': multiplier.get(),
+                    'start_day': start_day.get(), 'start_time': start_time.get(),
+                    'end_day': end_day.get(), 'end_time': end_time.get(),
+                })
+                updated['channels'].update({
+                    'reward_channel': reward_channel.get() or 0,
+                    'announcement_channel': announcement_channel.get() or 0,
+                })
+                updated['admin_role_id'] = admin_role.get() or 0
+                updated['timezone'] = timezone.get().strip() or 'Asia/Beirut'
+                updated['weekly_announcement'].update({
+                    'enabled': weekly_enabled.get(), 'day': weekly_day.get(), 'time': weekly_time.get(),
+                })
+                updated['monthly'].update({
+                    'enabled': monthly_enabled.get(), 'winner_count': monthly_winners.get(),
+                })
+                for name in ('branding', 'rewards', 'event', 'voice', 'weekly', 'monthly'):
+                    mark_setup_section(updated, name)
+                if reward_channel.get().strip() and announcement_channel.get().strip():
+                    mark_setup_section(updated, 'channels')
+                saved = save_config(guild_id, updated)
+            except (OSError, ValueError, TypeError) as exc:
+                messagebox.showerror('Setup not saved', str(exc), parent=tab.winfo_toplevel())
+                return
+            refresh_status(saved)
+            messagebox.showinfo('Guild setup saved', 'Guild configuration was saved. The Discord /setup command remains available.', parent=tab.winfo_toplevel())
+
+        refresh_status(config)
+        modern_button(tab, 'Save Guild Setup', save_setup, 'accent', anchor='w', padx=16, pady=(0, 12))
 
     def close_guild(self, gid):
         item = self.windows.pop(gid, None)
