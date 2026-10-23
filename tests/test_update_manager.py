@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 import zipfile
 
-from update_manager import Release, check_for_update, current_version, stage_release
+from update_manager import Release, _record_history, check_for_update, current_version, get_update_history, stage_release
 
 
 def file_url(path):
@@ -47,6 +47,17 @@ class UpdateManagerTests(unittest.TestCase):
             release = Release('4.0.4', file_url(archive), digest)
             with self.assertRaisesRegex(ValueError, 'checksum'):
                 stage_release(release, Path(temporary) / 'updates')
+
+    def test_update_history_is_local_and_tolerates_missing_file(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'bot'
+            root.mkdir()
+            self.assertEqual(get_update_history(root), {})
+            _record_history(root, 'last_update', {'from_version': '4.0.10', 'to_version': '4.0.11'})
+            history = get_update_history(root)
+            self.assertEqual(history['last_update']['from_version'], '4.0.10')
+            self.assertEqual(history['last_update']['to_version'], '4.0.11')
+            self.assertTrue(history['last_update']['at'])
 
 
 if __name__ == '__main__':

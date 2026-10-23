@@ -1,3 +1,7 @@
+v4.0.12
+- Added local GitHub update history showing the last check, successful update, and rollback.
+- Added Rollback Last Update, which restores tracked source files to the version before the last GitHub update and restarts the app. Local token, points, databases, logs, backups, and preferences remain untouched.
+
 v4.0.11
 - Replaced the unused release-feed check with Check for Updates, which safely compares the installed Git clone against GitHub without downloading or changing source files.
 

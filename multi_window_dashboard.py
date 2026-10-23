@@ -21,7 +21,7 @@ from connection_health import display_status
 from tkinter import messagebox, filedialog
 from analytics_reports import load_samples, summarize, export_csv, RANGE_SECONDS
 from backup_center import guild_ids, backup_folders, validate, create_manual, restore_offline, delete_backup
-from update_manager import check_git_update, current_version, update_from_git
+from update_manager import check_git_update, current_version, get_update_history, rollback_git_update, update_from_git
 from config_manager import load_config, save_config, mark_setup_section, setup_status
 import shutil
 import subprocess
@@ -406,16 +406,40 @@ class Dashboard:
                                       font=("Segoe UI", 11, "bold"), justify="left", anchor="w", wraplength=480)
         self.update_status.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
         self.accent_labels.append(self.update_status)
+        self.update_history = tk.Label(tab, bg=BG, fg=MUTED, justify="left", anchor="w", wraplength=480)
+        self.update_history.pack(fill="x", anchor="w", padx=16, pady=(0, 12))
+        self.refresh_update_history()
         modern_button(tab, "Update from GitHub", self.update_from_github, "accent", anchor="w", padx=16, pady=6)
         modern_button(tab, "Check for Updates", self.check_for_updates, "normal", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Rollback Last Update", self.rollback_last_update, "warning", anchor="w", padx=16, pady=6)
         tab.bind("<Configure>", self.resize_update_text, add="+")
 
     def resize_update_text(self, event):
         """Keep update messages visible as the Settings window is resized."""
         wraplength = max(300, event.width - 36)
-        for label in (getattr(self, "update_help", None), getattr(self, "update_status", None)):
+        for label in (getattr(self, "update_help", None), getattr(self, "update_status", None), getattr(self, "update_history", None)):
             if label is not None:
                 label.configure(wraplength=wraplength)
+
+    def refresh_update_history(self):
+        history = get_update_history(ROOT)
+        lines = []
+        last_check = history.get('last_check')
+        if isinstance(last_check, dict) and last_check.get('at'):
+            lines.append(f"Last GitHub check: {last_check['at']}")
+        last_update = history.get('last_update')
+        if isinstance(last_update, dict) and last_update.get('at'):
+            lines.append(
+                f"Last update: v{last_update.get('from_version', '?')} → v{last_update.get('to_version', '?')} "
+                f"({last_update['at']})"
+            )
+        last_rollback = history.get('last_rollback')
+        if isinstance(last_rollback, dict) and last_rollback.get('at'):
+            lines.append(
+                f"Last rollback: v{last_rollback.get('from_version', '?')} → v{last_rollback.get('to_version', '?')} "
+                f"({last_rollback['at']})"
+            )
+        self.update_history.configure(text='Update history: ' + ('\n'.join(lines) if lines else 'No GitHub checks or updates recorded yet.'))
 
     def check_for_updates(self):
         self.update_status.configure(text="Checking GitHub for updates…")
@@ -426,6 +450,7 @@ class Dashboard:
             self.update_status.configure(text=f"Update check failed: {exc}")
             return
         self.update_status.configure(text=result.details)
+        self.refresh_update_history()
 
     def update_from_github(self):
         if not messagebox.askyesno(
@@ -445,6 +470,30 @@ class Dashboard:
         if not result.updated:
             self.update_status.configure(text=result.details)
             return
+        self.restart_after_source_change('Update installed. Restarting Activity Rewards…')
+
+    def rollback_last_update(self):
+        if not messagebox.askyesno(
+            "Rollback Last Update",
+            "Restore the tracked source files from before the last GitHub update, then restart Activity Rewards?\n\n"
+            "Points, token, database, backups, logs, and preferences will not be changed.",
+            parent=self.root,
+        ):
+            return
+        self.update_status.configure(text='Restoring the previous GitHub version…')
+        self.root.update_idletasks()
+        try:
+            result = rollback_git_update(ROOT)
+        except (OSError, RuntimeError) as exc:
+            self.update_status.configure(text=f'Rollback failed: {exc}')
+            return
+        if not result.updated:
+            self.update_status.configure(text=result.details)
+            self.refresh_update_history()
+            return
+        self.restart_after_source_change('Rollback installed. Restarting Activity Rewards…')
+
+    def restart_after_source_change(self, success_message):
         helper = ROOT / 'restart_after_update.py'
         if not helper.is_file():
             self.update_status.configure(
@@ -465,7 +514,7 @@ class Dashboard:
                 text=f'GitHub source updated, but automatic restart could not start: {exc}. Use Restart Bot.'
             )
             return
-        self.update_status.configure('Update installed. Restarting Activity Rewards…')
+        self.update_status.configure(success_message)
 
     def refresh_now(self):
         """Refresh all guild data immediately without changing the polling schedule."""

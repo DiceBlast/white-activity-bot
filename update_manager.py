@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -21,6 +22,7 @@ import zipfile
 
 MAX_RELEASE_BYTES = 100 * 1024 * 1024
 MANIFEST_NAME = 'update_manifest.json'
+UPDATE_HISTORY_NAME = 'github_update_history.json'
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,33 @@ class GitUpdateResult:
 
     updated: bool
     details: str
+
+
+def _history_path(root: Path) -> Path:
+    return Path(root) / 'runtime' / UPDATE_HISTORY_NAME
+
+
+def get_update_history(root: Path) -> dict:
+    """Read local GitHub update history without creating or changing files."""
+    try:
+        payload = json.loads(_history_path(root).read_text(encoding='utf-8'))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _save_update_history(root: Path, payload: dict) -> None:
+    path = _history_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+    os.replace(temporary, path)
+
+
+def _record_history(root: Path, key: str, entry: dict) -> None:
+    history = get_update_history(root)
+    history[key] = {**entry, 'at': time.strftime('%Y-%m-%d %H:%M:%S %z')}
+    _save_update_history(root, history)
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -164,6 +193,8 @@ def update_from_git(root: Path) -> GitUpdateResult:
 
     if run('status', '--porcelain'):
         raise RuntimeError('Local source changes are present. Commit or discard them before updating.')
+    previous_commit = run('rev-parse', 'HEAD')
+    previous_version = current_version(root)
     run('remote', 'get-url', 'origin')
     run('fetch', '--prune', 'origin')
     ahead_behind = run('rev-list', '--left-right', '--count', 'HEAD...@{u}').split()
@@ -187,6 +218,12 @@ def update_from_git(root: Path) -> GitUpdateResult:
         if result.returncode:
             message = (result.stderr or result.stdout or 'Dependency installation failed.').strip()
             raise RuntimeError(f'GitHub source updated, but dependency installation failed: {message}')
+    _record_history(root, 'last_update', {
+        'from_commit': previous_commit,
+        'to_commit': run('rev-parse', 'HEAD'),
+        'from_version': previous_version,
+        'to_version': current_version(root),
+    })
     return GitUpdateResult(True, 'GitHub source and required packages were updated. Restart the bot to use the new code.')
 
 
@@ -212,6 +249,7 @@ def check_git_update(root: Path) -> GitUpdateResult:
         raise RuntimeError('Local source changes are present. Commit or discard them before checking for updates.')
     run('remote', 'get-url', 'origin')
     run('fetch', '--prune', 'origin')
+    _record_history(root, 'last_check', {})
     ahead_behind = run('rev-list', '--left-right', '--count', 'HEAD...@{u}').split()
     if len(ahead_behind) != 2 or not all(part.isdecimal() for part in ahead_behind):
         raise RuntimeError('Could not compare the local source with its GitHub branch.')
@@ -224,3 +262,47 @@ def check_git_update(root: Path) -> GitUpdateResult:
     if ahead and not behind:
         return GitUpdateResult(False, 'This installation has local source changes ahead of GitHub.')
     return GitUpdateResult(False, 'Local source and GitHub have diverged. Resolve the Git conflict before updating.')
+
+
+def rollback_git_update(root: Path) -> GitUpdateResult:
+    """Return tracked source to the version recorded before the last GitHub update."""
+    root = Path(root).resolve()
+    history = get_update_history(root)
+    last_update = history.get('last_update') if isinstance(history.get('last_update'), dict) else {}
+    target = str(last_update.get('from_commit', '')).strip()
+    if len(target) < 7 or len(target) > 64 or any(char not in '0123456789abcdefABCDEF' for char in target):
+        raise RuntimeError('No rollback point is available yet. Install a GitHub update first.')
+    git = shutil.which('git')
+    if not git:
+        raise RuntimeError('Git is not installed or is not available on PATH.')
+    if not (root / '.git').is_dir():
+        raise RuntimeError('This installation is not a Git clone. Run INSTALL.bat to connect GitHub updates.')
+
+    def run(*args: str) -> str:
+        result = subprocess.run([git, *args], cwd=root, text=True, capture_output=True, timeout=300)
+        if result.returncode:
+            message = (result.stderr or result.stdout or 'Git command failed.').strip()
+            raise RuntimeError(message)
+        return (result.stdout or result.stderr).strip()
+
+    if run('status', '--porcelain'):
+        raise RuntimeError('Local source changes are present. Commit or discard them before rolling back.')
+    current_commit = run('rev-parse', 'HEAD')
+    if current_commit.lower() == target.lower():
+        raise RuntimeError('This installation is already at the recorded rollback version.')
+    run('cat-file', '-e', f'{target}^{{commit}}')
+    current_version_value = current_version(root)
+    run('reset', '--hard', target)
+    requirements = root / 'requirements.txt'
+    if requirements.is_file():
+        result = subprocess.run([sys.executable, '-m', 'pip', 'install', '-r', str(requirements)], cwd=root, text=True, capture_output=True, timeout=300)
+        if result.returncode:
+            message = (result.stderr or result.stdout or 'Dependency installation failed.').strip()
+            raise RuntimeError(f'GitHub source was rolled back, but dependency installation failed: {message}')
+    _record_history(root, 'last_rollback', {
+        'from_commit': current_commit,
+        'to_commit': target,
+        'from_version': current_version_value,
+        'to_version': current_version(root),
+    })
+    return GitUpdateResult(True, 'Previous GitHub version restored. Restart the bot to use the rolled-back code.')
