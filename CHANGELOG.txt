@@ -1,3 +1,6 @@
+v4.0.8
+- Added a vertical scrollbar to the guild Setup tab so Weekly & Monthly settings and Save Guild Setup remain reachable on smaller windows.
+
 v4.0.7
 - A successful GitHub dashboard update now shuts down the old supervisor and dashboard, then automatically launches a fresh supervisor and dashboard using the downloaded code.
 - The automatic restart waits for the old single-instance lock to release; tokens, points, databases, logs, backups, and preferences remain local and untouched.

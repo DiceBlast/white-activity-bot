@@ -866,17 +866,35 @@ class Dashboard:
         """Desktop equivalent of the Discord /setup flow for one guild."""
         config = load_config(guild_id)
         status = setup_status(config)
-        tk.Label(tab, text='GUILD SETUP', bg=BG, fg=TEXT,
+        canvas = tk.Canvas(tab, bg=BG, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tab, orient='vertical', command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side='right', fill='y', pady=2)
+        canvas.pack(side='left', fill='both', expand=True)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+
+        def sync_scroll_region(event=None):
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+        def fit_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+
+        canvas.bind('<Configure>', fit_content_width)
+        content.bind('<Configure>', sync_scroll_region)
+        canvas.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
+
+        tk.Label(content, text='GUILD SETUP', bg=BG, fg=TEXT,
                  font=('Segoe UI', self.font_size + 2, 'bold')).pack(anchor='w', padx=16, pady=(14, 2))
         tk.Label(
-            tab,
+            content,
             text='Configure this guild locally. The Discord /setup command remains available and uses the same saved settings.',
             bg=BG, fg=MUTED, justify='left', anchor='w', wraplength=900,
         ).pack(fill='x', padx=16, pady=(0, 8))
-        status_label = tk.Label(tab, bg=BG, fg=ACCENT, anchor='w', font=('Segoe UI', 10, 'bold'))
+        status_label = tk.Label(content, bg=BG, fg=ACCENT, anchor='w', font=('Segoe UI', 10, 'bold'))
         status_label.pack(fill='x', padx=16, pady=(0, 10))
 
-        form = tk.Frame(tab, bg=BG)
+        form = tk.Frame(content, bg=BG)
         form.pack(fill='both', expand=True, padx=16, pady=(0, 8))
         left = tk.Frame(form, bg=BG)
         right = tk.Frame(form, bg=BG)
@@ -994,7 +1012,7 @@ class Dashboard:
             messagebox.showinfo('Guild setup saved', 'Guild configuration was saved. The Discord /setup command remains available.', parent=tab.winfo_toplevel())
 
         refresh_status(config)
-        modern_button(tab, 'Save Guild Setup', save_setup, 'accent', anchor='w', padx=16, pady=(0, 12))
+        modern_button(content, 'Save Guild Setup', save_setup, 'accent', anchor='w', padx=16, pady=(0, 12))
 
     def close_guild(self, gid):
         item = self.windows.pop(gid, None)
