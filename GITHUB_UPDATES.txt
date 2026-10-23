@@ -1,0 +1,12 @@
+GitHub updates are preconfigured by INSTALL.bat for this package.
+
+Repository: https://github.com/DiceBlast/white-activity-bot
+
+Before installation, install Git for Windows if it is not already installed:
+  winget install --id Git.Git -e --source winget
+
+If the repository is private, Git will require the installer to sign in once.
+If the repository is public, no GitHub login is needed for updates.
+
+After INSTALL.bat and SETUP.bat, start the bot with START_BOT.bat. Settings >
+Updates > Update from GitHub will work without any additional Git setup.

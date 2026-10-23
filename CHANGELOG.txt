@@ -1,3 +1,7 @@
+v4.0.9
+- Hide Recent Activity while the guild Setup tab is selected, giving the scrollable configuration form the full lower window area.
+- Fresh Windows installs now configure the official GitHub remote during INSTALL.bat when Git is available, so dashboard updates work immediately after setup.
+
 v4.0.8
 - Added a vertical scrollbar to the guild Setup tab so Weekly & Monthly settings and Save Guild Setup remain reachable on smaller windows.
 

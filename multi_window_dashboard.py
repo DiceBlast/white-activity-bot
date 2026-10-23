@@ -833,6 +833,7 @@ class Dashboard:
         tabs.add(analytics_page, text='Analytics')
         tabs.add(setup_page, text='Setup')
         self.build_guild_setup_tab(setup_page, gid)
+        activity_panel = tk.Frame(win, bg=BG)
         tk.Label(analytics_page, text='VOICE & MEMBER HISTORY', bg=BG, fg=ACCENT, font=('Segoe UI', 11, 'bold')).pack(anchor='w', padx=14, pady=(12, 3))
         analytics_toolbar = tk.Frame(analytics_page, bg=BG)
         analytics_toolbar.pack(fill='x', padx=14, pady=(4, 5))
@@ -854,8 +855,17 @@ class Dashboard:
         reward_display = create_log_area(rewards_page, self.font_size)
         self.log_widgets.extend((voice_display, reward_display))
         self.detail_tabs[gid] = (voice_display, reward_display)
-        tk.Label(win, text="RECENT ACTIVITY / REWARDS / ERRORS", bg=BG, fg=ACCENT, font=("DejaVu Sans", self.font_size, "bold")).pack(anchor="w", padx=14)
-        output = create_log_area(win, self.font_size)
+        tk.Label(activity_panel, text="RECENT ACTIVITY / REWARDS / ERRORS", bg=BG, fg=ACCENT, font=("DejaVu Sans", self.font_size, "bold")).pack(anchor="w", padx=14)
+        output = create_log_area(activity_panel, self.font_size)
+        activity_panel.pack(fill='both', expand=True, padx=0, pady=(0, 2))
+
+        def update_activity_visibility(event=None):
+            if tabs.select() == str(setup_page):
+                activity_panel.pack_forget()
+            elif not activity_panel.winfo_manager():
+                activity_panel.pack(fill='both', expand=True, padx=0, pady=(0, 2))
+
+        tabs.bind('<<NotebookTabChanged>>', update_activity_visibility, add='+')
         self.log_widgets.append(output)
         self.windows[gid] = (win, label, detail, output)
         self.accent_labels.append(label)

@@ -1,4 +1,4 @@
-WhiteLabel Activity Bot v4.0.8
+WhiteLabel Activity Bot v4.0.9
 Fresh installation: INSTALL.bat -> SETUP.bat -> CHECK_RELEASE.bat -> START_BOT.bat
 Existing bot: read README_V403.txt and run UPGRADE_EXISTING.bat from this extracted release.
 Do not copy release files over data, backups or credentials.
