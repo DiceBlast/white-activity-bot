@@ -21,7 +21,7 @@ from connection_health import display_status
 from tkinter import messagebox, filedialog
 from analytics_reports import load_samples, summarize, export_csv, RANGE_SECONDS
 from backup_center import guild_ids, backup_folders, validate, create_manual, restore_offline, delete_backup
-from update_manager import check_for_update, current_version, update_from_git
+from update_manager import check_git_update, current_version, update_from_git
 from config_manager import load_config, save_config, mark_setup_section, setup_status
 import shutil
 import subprocess
@@ -402,12 +402,12 @@ class Dashboard:
             bg=BG, fg=MUTED, justify="left", anchor="w", wraplength=480,
         )
         self.update_help.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
-        self.update_status = tk.Label(tab, text="Update feed not configured.", bg=BG, fg=ACCENT,
+        self.update_status = tk.Label(tab, text="Check GitHub to see whether an update is available.", bg=BG, fg=ACCENT,
                                       font=("Segoe UI", 11, "bold"), justify="left", anchor="w", wraplength=480)
         self.update_status.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
         self.accent_labels.append(self.update_status)
         modern_button(tab, "Update from GitHub", self.update_from_github, "accent", anchor="w", padx=16, pady=6)
-        modern_button(tab, "Check Release Feed", self.check_for_updates, "normal", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Check for Updates", self.check_for_updates, "normal", anchor="w", padx=16, pady=6)
         tab.bind("<Configure>", self.resize_update_text, add="+")
 
     def resize_update_text(self, event):
@@ -418,21 +418,14 @@ class Dashboard:
                 label.configure(wraplength=wraplength)
 
     def check_for_updates(self):
-        manifest_url = os.environ.get("ACTIVITY_REWARDS_UPDATE_MANIFEST_URL", "").strip()
-        if not manifest_url:
-            self.update_status.configure(
-                text="No update feed is configured yet. Set ACTIVITY_REWARDS_UPDATE_MANIFEST_URL after publishing a verified GitHub Release.",
-            )
-            return
+        self.update_status.configure(text="Checking GitHub for updates…")
+        self.root.update_idletasks()
         try:
-            release = check_for_update(ROOT, manifest_url)
-        except (OSError, ValueError) as exc:
+            result = check_git_update(ROOT)
+        except (OSError, RuntimeError) as exc:
             self.update_status.configure(text=f"Update check failed: {exc}")
             return
-        if release is None:
-            self.update_status.configure(text="You are running the latest available version.")
-        else:
-            self.update_status.configure(text=f"Version {release.version} is available and ready to be staged after confirmation.")
+        self.update_status.configure(text=result.details)
 
     def update_from_github(self):
         if not messagebox.askyesno(

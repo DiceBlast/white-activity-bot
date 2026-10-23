@@ -188,3 +188,39 @@ def update_from_git(root: Path) -> GitUpdateResult:
             message = (result.stderr or result.stdout or 'Dependency installation failed.').strip()
             raise RuntimeError(f'GitHub source updated, but dependency installation failed: {message}')
     return GitUpdateResult(True, 'GitHub source and required packages were updated. Restart the bot to use the new code.')
+
+
+def check_git_update(root: Path) -> GitUpdateResult:
+    """Check the configured GitHub remote without changing source or packages."""
+    root = Path(root).resolve()
+    git = shutil.which('git')
+    if not git:
+        raise RuntimeError('Git is not installed or is not available on PATH.')
+    if not (root / '.git').is_dir():
+        raise RuntimeError('This installation is not a Git clone. Run INSTALL.bat to connect GitHub updates.')
+
+    def run(*args: str) -> str:
+        result = subprocess.run(
+            [git, *args], cwd=root, text=True, capture_output=True, timeout=90,
+        )
+        if result.returncode:
+            message = (result.stderr or result.stdout or 'Git command failed.').strip()
+            raise RuntimeError(message)
+        return (result.stdout or result.stderr).strip()
+
+    if run('status', '--porcelain'):
+        raise RuntimeError('Local source changes are present. Commit or discard them before checking for updates.')
+    run('remote', 'get-url', 'origin')
+    run('fetch', '--prune', 'origin')
+    ahead_behind = run('rev-list', '--left-right', '--count', 'HEAD...@{u}').split()
+    if len(ahead_behind) != 2 or not all(part.isdecimal() for part in ahead_behind):
+        raise RuntimeError('Could not compare the local source with its GitHub branch.')
+    ahead, behind = (int(part) for part in ahead_behind)
+    if not ahead and not behind:
+        return GitUpdateResult(False, 'You are running the latest GitHub version.')
+    if not ahead and behind:
+        plural = 's' if behind != 1 else ''
+        return GitUpdateResult(True, f'{behind} GitHub update{plural} available. Select Update from GitHub to install it.')
+    if ahead and not behind:
+        return GitUpdateResult(False, 'This installation has local source changes ahead of GitHub.')
+    return GitUpdateResult(False, 'Local source and GitHub have diverged. Resolve the Git conflict before updating.')
