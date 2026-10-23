@@ -1,3 +1,7 @@
+v4.0.10
+- Removed the guild window's Recent Activity / Rewards / Errors panel to give Live Voice, Rewards, Analytics, and Setup more space.
+- Removed the Setup tab's internal scrollbar for a cleaner fixed layout.
+
 v4.0.9
 - Hide Recent Activity while the guild Setup tab is selected, giving the scrollable configuration form the full lower window area.
 - Fresh Windows installs now configure the official GitHub remote during INSTALL.bat when Git is available, so dashboard updates work immediately after setup.

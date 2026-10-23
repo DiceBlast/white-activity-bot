@@ -781,7 +781,7 @@ class Dashboard:
                 pass
         self.style.configure("Guild.Treeview", font=("DejaVu Sans", new_size), rowheight=new_size + 16)
         self.style.configure("Guild.Treeview.Heading", font=("DejaVu Sans", new_size, "bold"))
-        for gid, (win, label, detail, output) in self.windows.items():
+        for gid, (win, label, detail) in self.windows.items():
             label.configure(font=("DejaVu Sans", new_size + 1, "bold"))
             detail.configure(font=("DejaVu Sans", new_size))
             if gid in self.summary_widgets:
@@ -833,7 +833,6 @@ class Dashboard:
         tabs.add(analytics_page, text='Analytics')
         tabs.add(setup_page, text='Setup')
         self.build_guild_setup_tab(setup_page, gid)
-        activity_panel = tk.Frame(win, bg=BG)
         tk.Label(analytics_page, text='VOICE & MEMBER HISTORY', bg=BG, fg=ACCENT, font=('Segoe UI', 11, 'bold')).pack(anchor='w', padx=14, pady=(12, 3))
         analytics_toolbar = tk.Frame(analytics_page, bg=BG)
         analytics_toolbar.pack(fill='x', padx=14, pady=(4, 5))
@@ -855,19 +854,7 @@ class Dashboard:
         reward_display = create_log_area(rewards_page, self.font_size)
         self.log_widgets.extend((voice_display, reward_display))
         self.detail_tabs[gid] = (voice_display, reward_display)
-        tk.Label(activity_panel, text="RECENT ACTIVITY / REWARDS / ERRORS", bg=BG, fg=ACCENT, font=("DejaVu Sans", self.font_size, "bold")).pack(anchor="w", padx=14)
-        output = create_log_area(activity_panel, self.font_size)
-        activity_panel.pack(fill='both', expand=True, padx=0, pady=(0, 2))
-
-        def update_activity_visibility(event=None):
-            if tabs.select() == str(setup_page):
-                activity_panel.pack_forget()
-            elif not activity_panel.winfo_manager():
-                activity_panel.pack(fill='both', expand=True, padx=0, pady=(0, 2))
-
-        tabs.bind('<<NotebookTabChanged>>', update_activity_visibility, add='+')
-        self.log_widgets.append(output)
-        self.windows[gid] = (win, label, detail, output)
+        self.windows[gid] = (win, label, detail)
         self.accent_labels.append(label)
         win.protocol("WM_DELETE_WINDOW", lambda: self.close_guild(gid))
         self.update_guild(gid)
@@ -876,35 +863,17 @@ class Dashboard:
         """Desktop equivalent of the Discord /setup flow for one guild."""
         config = load_config(guild_id)
         status = setup_status(config)
-        canvas = tk.Canvas(tab, bg=BG, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(tab, orient='vertical', command=canvas.yview)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side='right', fill='y', pady=2)
-        canvas.pack(side='left', fill='both', expand=True)
-        content = tk.Frame(canvas, bg=BG)
-        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
-
-        def sync_scroll_region(event=None):
-            canvas.configure(scrollregion=canvas.bbox('all'))
-
-        def fit_content_width(event):
-            canvas.itemconfigure(content_window, width=event.width)
-
-        canvas.bind('<Configure>', fit_content_width)
-        content.bind('<Configure>', sync_scroll_region)
-        canvas.bind('<MouseWheel>', lambda event: canvas.yview_scroll(-int(event.delta / 120), 'units'))
-
-        tk.Label(content, text='GUILD SETUP', bg=BG, fg=TEXT,
+        tk.Label(tab, text='GUILD SETUP', bg=BG, fg=TEXT,
                  font=('Segoe UI', self.font_size + 2, 'bold')).pack(anchor='w', padx=16, pady=(14, 2))
         tk.Label(
-            content,
+            tab,
             text='Configure this guild locally. The Discord /setup command remains available and uses the same saved settings.',
             bg=BG, fg=MUTED, justify='left', anchor='w', wraplength=900,
         ).pack(fill='x', padx=16, pady=(0, 8))
-        status_label = tk.Label(content, bg=BG, fg=ACCENT, anchor='w', font=('Segoe UI', 10, 'bold'))
+        status_label = tk.Label(tab, bg=BG, fg=ACCENT, anchor='w', font=('Segoe UI', 10, 'bold'))
         status_label.pack(fill='x', padx=16, pady=(0, 10))
 
-        form = tk.Frame(content, bg=BG)
+        form = tk.Frame(tab, bg=BG)
         form.pack(fill='both', expand=True, padx=16, pady=(0, 8))
         left = tk.Frame(form, bg=BG)
         right = tk.Frame(form, bg=BG)
@@ -1022,7 +991,7 @@ class Dashboard:
             messagebox.showinfo('Guild setup saved', 'Guild configuration was saved. The Discord /setup command remains available.', parent=tab.winfo_toplevel())
 
         refresh_status(config)
-        modern_button(content, 'Save Guild Setup', save_setup, 'accent', anchor='w', padx=16, pady=(0, 12))
+        modern_button(tab, 'Save Guild Setup', save_setup, 'accent', anchor='w', padx=16, pady=(0, 12))
 
     def close_guild(self, gid):
         item = self.windows.pop(gid, None)
@@ -1039,7 +1008,7 @@ class Dashboard:
         if gid not in self.windows:
             return
         item = self.guilds[gid]
-        win, label, detail, output = self.windows[gid]
+        win, label, detail = self.windows[gid]
         status = "LEFT SERVER" if item.get("removed") else "KNOWN GUILD"
         win.title(f"Activity Rewards — {item['name']}")
         label.config(text=item['name'])
@@ -1072,7 +1041,6 @@ class Dashboard:
             refresh_text(voice_display, voice_lines)
             reward_lines = recent_reward_activity(gid)
             refresh_text(reward_display, reward_lines or ['No recent reward delivery entries in available logs.'])
-        refresh_text(output, item['lines'])
         if time.monotonic() - self._analytics_last_draw.get(gid, 0) > 10:
             self.draw_analytics(gid)
 
