@@ -1,3 +1,7 @@
+v4.0.7
+- A successful GitHub dashboard update now shuts down the old supervisor and dashboard, then automatically launches a fresh supervisor and dashboard using the downloaded code.
+- The automatic restart waits for the old single-instance lock to release; tokens, points, databases, logs, backups, and preferences remain local and untouched.
+
 v4.0.6
 - Added a Setup tab to every guild dashboard window for local configuration of branding, rewards, voice rules, events, channels, weekly, and monthly settings.
 - The Discord /setup command remains available and uses the same guild configuration.

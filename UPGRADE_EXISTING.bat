@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo Activity Rewards v4.0.6 - SAFE CODE-ONLY UPGRADE
+echo Activity Rewards v4.0.7 - SAFE CODE-ONLY UPGRADE
  echo.
 echo Use Shutdown All on the existing bot before upgrading.
 echo Drag the EXISTING bot folder into this window, then press Enter.

@@ -24,6 +24,8 @@ from backup_center import guild_ids, backup_folders, validate, create_manual, re
 from update_manager import check_for_update, current_version, update_from_git
 from config_manager import load_config, save_config, mark_setup_section, setup_status
 import shutil
+import subprocess
+import sys
 import time
 
 try:
@@ -436,7 +438,7 @@ class Dashboard:
         if not messagebox.askyesno(
             "Update from GitHub",
             "Download the latest tracked code from this installation's configured GitHub remote and install its Python requirements?\n\n"
-            "Your bot keeps running until you choose Restart Bot. Local token, data, backups, logs, and preferences are not changed.",
+            "After a successful update, Activity Rewards will restart automatically. Local token, data, backups, logs, and preferences are not changed.",
             parent=self.root,
         ):
             return
@@ -447,7 +449,30 @@ class Dashboard:
         except (OSError, RuntimeError) as exc:
             self.update_status.configure(text=f"GitHub update failed: {exc}")
             return
-        self.update_status.configure(text=result.details)
+        if not result.updated:
+            self.update_status.configure(text=result.details)
+            return
+        helper = ROOT / 'restart_after_update.py'
+        if not helper.is_file():
+            self.update_status.configure(
+                text='GitHub source updated, but the restart helper is missing. Use Restart Bot once, then try again.'
+            )
+            return
+        try:
+            flags = 0
+            if os.name == 'nt':
+                flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            subprocess.Popen(
+                [sys.executable, str(helper)], cwd=ROOT,
+                creationflags=flags, close_fds=(os.name != 'nt'),
+            )
+            request_action('shutdown')
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.update_status.configure(
+                text=f'GitHub source updated, but automatic restart could not start: {exc}. Use Restart Bot.'
+            )
+            return
+        self.update_status.configure('Update installed. Restarting Activity Rewards…')
 
     def refresh_now(self):
         """Refresh all guild data immediately without changing the polling schedule."""
