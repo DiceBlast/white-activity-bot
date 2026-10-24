@@ -30,6 +30,7 @@ CODE_FILES = (
     'UPGRADE_EXISTING.bat', 'CONNECT_GITHUB_UPDATES.bat',
     'VERSION.txt', 'README.md', 'GITHUB_UPDATES.txt',
     'release_preflight.py', 'update_manager.py', 'restart_after_update.py',
+    'release_installer.py',
     'connect_github_updates.py',
 )
 OBSOLETE_CODE_FILES = (

@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import argparse
 
 
 ROOT = Path(__file__).resolve().parent
@@ -39,12 +40,26 @@ def supervisor_lock_is_free() -> bool:
     return True
 
 
-def main() -> int:
+def main(release_archive: Path | None = None) -> int:
     if not PYTHON.is_file() or not SUPERVISOR.is_file():
         return 1
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
         if supervisor_lock_is_free():
+            if release_archive is not None:
+                installer = ROOT / 'release_installer.py'
+                if not installer.is_file():
+                    return 3
+                result = subprocess.run(
+                    [str(PYTHON), str(installer), str(release_archive), str(ROOT)],
+                    cwd=str(ROOT), text=True, capture_output=True,
+                )
+                if result.returncode:
+                    # The old source stays intact when installation fails. Start it
+                    # again instead of leaving the customer bot offline.
+                    flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+                    subprocess.Popen([str(PYTHON), str(SUPERVISOR)], cwd=str(ROOT), creationflags=flags)
+                    return result.returncode
             flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
             subprocess.Popen([str(PYTHON), str(SUPERVISOR)], cwd=str(ROOT), creationflags=flags)
             return 0
@@ -53,4 +68,7 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--release', type=Path, help='Verified staged GitHub Release ZIP')
+    arguments = parser.parse_args()
+    raise SystemExit(main(arguments.release))

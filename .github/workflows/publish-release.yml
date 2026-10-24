@@ -1,0 +1,24 @@
+name: Publish Activity Rewards release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build safe Windows release ZIP
+        run: python build_release.py
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION.txt -Raw).Trim().Split()[0]
+          gh release create "v$version" "dist/ActivityRewards-v$version.zip" "dist/ActivityRewards-v$version.zip.sha256" --title "Activity Rewards v$version" --generate-notes

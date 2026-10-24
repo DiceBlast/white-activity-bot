@@ -23,6 +23,8 @@ import zipfile
 MAX_RELEASE_BYTES = 100 * 1024 * 1024
 MANIFEST_NAME = 'update_manifest.json'
 UPDATE_HISTORY_NAME = 'github_update_history.json'
+GITHUB_RELEASE_API = 'https://api.github.com/repos/DiceBlast/white-activity-bot/releases/latest'
+GITHUB_TOKEN_ENV = 'ACTIVITY_REWARDS_GITHUB_TOKEN'
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,18 @@ class GitUpdateResult:
 
     updated: bool
     details: str
+
+
+def _github_headers() -> dict[str, str]:
+    """Return API headers without ever saving a token to disk."""
+    headers = {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'ActivityRewards-Updater/1.0',
+    }
+    token = os.environ.get(GITHUB_TOKEN_ENV, '').strip()
+    if token:
+        headers['Authorization'] = f'Bearer {token}'
+    return headers
 
 
 def _history_path(root: Path) -> Path:
@@ -80,11 +94,11 @@ def current_version(root: Path) -> str:
     return value
 
 
-def _read_json_url(url: str) -> dict:
+def _read_json_url(url: str, headers: dict[str, str] | None = None) -> dict:
     parsed = urlparse(url)
     if parsed.scheme not in ('https', 'file'):
         raise ValueError('Update manifest must use HTTPS (or file:// for a local test).')
-    request = Request(url, headers={'User-Agent': 'ActivityRewards-Updater/1.0'})
+    request = Request(url, headers=headers or {'User-Agent': 'ActivityRewards-Updater/1.0'})
     with urlopen(request, timeout=15) as response:
         payload = response.read(256_000)
     try:
@@ -94,6 +108,13 @@ def _read_json_url(url: str) -> dict:
     if not isinstance(parsed_json, dict):
         raise ValueError('Update manifest must be a JSON object.')
     return parsed_json
+
+
+def _read_checksum_url(url: str, headers: dict[str, str]) -> str:
+    request = Request(url, headers=headers)
+    with urlopen(request, timeout=15) as response:
+        value = response.read(512).decode('ascii', errors='strict').strip().split()[0].lower()
+    return value
 
 
 def fetch_release(manifest_url: str) -> Release:
@@ -112,6 +133,63 @@ def fetch_release(manifest_url: str) -> Release:
 
 def check_for_update(root: Path, manifest_url: str) -> Release | None:
     release = fetch_release(manifest_url)
+    return release if _version_tuple(release.version) > _version_tuple(current_version(root)) else None
+
+
+def _release_from_github_payload(payload: dict) -> Release:
+    """Convert one GitHub release response to a verified downloadable release."""
+    if payload.get('draft') or payload.get('prerelease'):
+        raise ValueError('The latest GitHub release is not a published stable release.')
+    version = str(payload.get('tag_name') or payload.get('name') or '').strip().lstrip('vV')
+    _version_tuple(version)
+    assets = payload.get('assets')
+    if not isinstance(assets, list):
+        raise ValueError('GitHub release does not contain downloadable assets.')
+    zips = [asset for asset in assets if isinstance(asset, dict) and str(asset.get('name', '')).lower().endswith('.zip')]
+    if len(zips) != 1:
+        raise ValueError('GitHub release must contain exactly one Activity Rewards ZIP asset.')
+    asset = zips[0]
+    download_url = str(asset.get('browser_download_url', '')).strip()
+    digest = str(asset.get('digest', '')).strip().lower()
+    if digest.startswith('sha256:'):
+        digest = digest.removeprefix('sha256:')
+    if len(digest) != 64 or any(char not in '0123456789abcdef' for char in digest):
+        checksum_assets = [
+            item for item in assets if isinstance(item, dict)
+            and str(item.get('name', '')).lower() == str(asset.get('name', '')).lower() + '.sha256'
+        ]
+        if len(checksum_assets) == 1:
+            checksum_url = str(checksum_assets[0].get('browser_download_url', '')).strip()
+            if checksum_url:
+                digest = _read_checksum_url(checksum_url, _github_headers())
+    if len(digest) != 64 or any(char not in '0123456789abcdef' for char in digest):
+        raise ValueError('GitHub release ZIP is missing its SHA-256 digest. Publish it through the release workflow.')
+    return Release(version, download_url, digest)
+
+
+def fetch_github_release() -> Release:
+    """Read the latest published GitHub Release without changing the installation.
+
+    Public releases work with no setup. A private repository needs a short-lived
+    token supplied only through ``ACTIVITY_REWARDS_GITHUB_TOKEN`` on that PC.
+    The token is never written to a file, log, update history, or backup.
+    """
+    try:
+        payload = _read_json_url(GITHUB_RELEASE_API, _github_headers())
+    except Exception as exc:
+        message = str(exc)
+        if '401' in message or '404' in message:
+            raise RuntimeError(
+                'GitHub Release feed is unavailable. Make the repository public, or set '
+                f'{GITHUB_TOKEN_ENV} on this PC for private releases.'
+            ) from exc
+        raise RuntimeError(f'Could not read the GitHub Release feed: {message}') from exc
+    return _release_from_github_payload(payload)
+
+
+def check_github_release_update(root: Path) -> Release | None:
+    release = fetch_github_release()
+    _record_history(Path(root), 'last_release_check', {'available_version': release.version})
     return release if _version_tuple(release.version) > _version_tuple(current_version(root)) else None
 
 

@@ -1,3 +1,8 @@
+v4.2.0
+- Added GitHub Release updates: no local Git install or cloned repository is needed for checking and installing published releases.
+- Release ZIPs are checksum-verified before download, program files are backed up before replacement, and the bot restarts automatically.
+- Release installation never replaces the token, points/data, backups, logs, runtime files, or dashboard preferences.
+
 v4.1.0
 - Cleaned the Windows release: removed obsolete check-release, invite, and multi-window batch helpers, along with old version-specific readme files.
 - Added one current README.md and moved the Discord invite URL into SETUP.bat's guided setup flow.

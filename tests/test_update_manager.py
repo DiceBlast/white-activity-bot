@@ -5,7 +5,10 @@ import unittest
 from pathlib import Path
 import zipfile
 
-from update_manager import Release, _record_history, check_for_update, current_version, get_update_history, stage_release
+from update_manager import (
+    Release, _record_history, _release_from_github_payload, check_for_update,
+    current_version, get_update_history, stage_release,
+)
 
 
 def file_url(path):
@@ -58,6 +61,22 @@ class UpdateManagerTests(unittest.TestCase):
             self.assertEqual(history['last_update']['from_version'], '4.0.10')
             self.assertEqual(history['last_update']['to_version'], '4.0.11')
             self.assertTrue(history['last_update']['at'])
+
+    def test_github_release_requires_verified_zip_digest(self):
+        release = _release_from_github_payload({
+            'tag_name': 'v4.2.0',
+            'assets': [{
+                'name': 'ActivityRewards-v4.2.0.zip',
+                'browser_download_url': 'https://example.test/release.zip',
+                'digest': 'sha256:' + ('a' * 64),
+            }],
+        })
+        self.assertEqual(release, Release('4.2.0', 'https://example.test/release.zip', 'a' * 64))
+        with self.assertRaisesRegex(ValueError, 'digest'):
+            _release_from_github_payload({
+                'tag_name': 'v4.2.0',
+                'assets': [{'name': 'ActivityRewards-v4.2.0.zip', 'browser_download_url': 'https://example.test/release.zip'}],
+            })
 
 
 if __name__ == '__main__':

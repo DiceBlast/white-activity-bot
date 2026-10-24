@@ -21,7 +21,10 @@ from connection_health import display_status
 from tkinter import messagebox, filedialog
 from analytics_reports import load_samples, summarize, export_csv, RANGE_SECONDS
 from backup_center import guild_ids, backup_folders, validate, create_manual, restore_offline, delete_backup
-from update_manager import check_git_update, current_version, get_update_history, rollback_git_update, update_from_git
+from update_manager import (
+    check_github_release_update, check_git_update, current_version,
+    get_update_history, rollback_git_update, stage_release, update_from_git,
+)
 from config_manager import load_config, save_config, mark_setup_section, setup_status
 import shutil
 import subprocess
@@ -398,19 +401,20 @@ class Dashboard:
                  font=("Segoe UI", 11)).pack(anchor="w", padx=16, pady=(0, 8))
         self.update_help = tk.Label(
             tab,
-            text="Update this Git clone from its configured GitHub remote. The action only changes tracked source files, then installs requirements such as davey. Tokens, data, backups, logs, and preferences remain local.",
+            text="Check published GitHub Releases without needing Git installed. A release update replaces program files only, creates a code backup, and restarts automatically. Tokens, points, data, backups, logs, and preferences remain local.",
             bg=BG, fg=MUTED, justify="left", anchor="w", wraplength=480,
         )
         self.update_help.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
-        self.update_status = tk.Label(tab, text="Check GitHub to see whether an update is available.", bg=BG, fg=ACCENT,
+        self.update_status = tk.Label(tab, text="Check GitHub Releases to see whether an update is available.", bg=BG, fg=ACCENT,
                                       font=("Segoe UI", 11, "bold"), justify="left", anchor="w", wraplength=480)
         self.update_status.pack(fill="x", anchor="w", padx=16, pady=(0, 16))
         self.accent_labels.append(self.update_status)
         self.update_history = tk.Label(tab, bg=BG, fg=MUTED, justify="left", anchor="w", wraplength=480)
         self.update_history.pack(fill="x", anchor="w", padx=16, pady=(0, 12))
         self.refresh_update_history()
-        modern_button(tab, "Update from GitHub", self.update_from_github, "accent", anchor="w", padx=16, pady=6)
-        modern_button(tab, "Check for Updates", self.check_for_updates, "normal", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Install Latest Release", self.install_latest_release, "accent", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Check GitHub Releases", self.check_release_updates, "normal", anchor="w", padx=16, pady=6)
+        modern_button(tab, "Legacy Git Update", self.update_from_github, "normal", anchor="w", padx=16, pady=6)
         modern_button(tab, "Rollback Last Update", self.rollback_last_update, "warning", anchor="w", padx=16, pady=6)
         tab.bind("<Configure>", self.resize_update_text, add="+")
 
@@ -427,6 +431,12 @@ class Dashboard:
         last_check = history.get('last_check')
         if isinstance(last_check, dict) and last_check.get('at'):
             lines.append(f"Last GitHub check: {last_check['at']}")
+        last_release_check = history.get('last_release_check')
+        if isinstance(last_release_check, dict) and last_release_check.get('at'):
+            lines.append(
+                f"Last release check: {last_release_check['at']} "
+                f"(latest: v{last_release_check.get('available_version', '?')})"
+            )
         last_update = history.get('last_update')
         if isinstance(last_update, dict) and last_update.get('at'):
             lines.append(
@@ -440,6 +450,47 @@ class Dashboard:
                 f"({last_rollback['at']})"
             )
         self.update_history.configure(text='Update history: ' + ('\n'.join(lines) if lines else 'No GitHub checks or updates recorded yet.'))
+
+    def check_release_updates(self):
+        self.update_status.configure(text="Checking GitHub Releases…")
+        self.root.update_idletasks()
+        try:
+            release = check_github_release_update(ROOT)
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.update_status.configure(text=f"Release check failed: {exc}")
+            return
+        if release is None:
+            self.update_status.configure(text="You are running the latest published GitHub Release.")
+        else:
+            self.update_status.configure(
+                text=f"Version {release.version} is ready. Select Install Latest Release to download, back up code, and restart."
+            )
+        self.refresh_update_history()
+
+    def install_latest_release(self):
+        if not messagebox.askyesno(
+            "Install Latest Release",
+            "Download the latest verified GitHub Release, replace program files only, and restart Activity Rewards?\n\n"
+            "A code backup is kept. Your token, points, data, backups, logs, and preferences are not changed.",
+            parent=self.root,
+        ):
+            return
+        self.update_status.configure(text="Checking and downloading the GitHub Release…")
+        self.root.update_idletasks()
+        try:
+            release = check_github_release_update(ROOT)
+            if release is None:
+                self.update_status.configure(text="You are already running the latest published GitHub Release.")
+                self.refresh_update_history()
+                return
+            archive = stage_release(release, ROOT / 'runtime' / 'release_staging')
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.update_status.configure(text=f"Release update failed: {exc}")
+            return
+        self.restart_after_source_change(
+            f"Release v{release.version} downloaded. Backing up code and restarting Activity Rewards…",
+            release_archive=archive,
+        )
 
     def check_for_updates(self):
         self.update_status.configure(text="Checking GitHub for updates…")
@@ -493,7 +544,7 @@ class Dashboard:
             return
         self.restart_after_source_change('Rollback installed. Restarting Activity Rewards…')
 
-    def restart_after_source_change(self, success_message):
+    def restart_after_source_change(self, success_message, release_archive=None):
         helper = ROOT / 'restart_after_update.py'
         if not helper.is_file():
             self.update_status.configure(
@@ -504,8 +555,11 @@ class Dashboard:
             flags = 0
             if os.name == 'nt':
                 flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            command = [sys.executable, str(helper)]
+            if release_archive is not None:
+                command.extend(['--release', str(release_archive)])
             subprocess.Popen(
-                [sys.executable, str(helper)], cwd=ROOT,
+                command, cwd=ROOT,
                 creationflags=flags, close_fds=(os.name != 'nt'),
             )
             request_action('shutdown')
