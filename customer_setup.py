@@ -38,7 +38,10 @@ def main():
     finally:
         tmp.unlink(missing_ok=True)
     print('Local settings saved. No token has been printed.')
-    print('Next: run INVITE_BOT.bat and then START_BOT.bat.')
+    invite_url = f'https://discord.com/oauth2/authorize?client_id={app_id}&scope=bot%20applications.commands&permissions=8'
+    print('Invite the bot with this URL:')
+    print(invite_url)
+    print('Next: open the URL, invite the bot to your server, then run START_BOT.bat.')
 
 if __name__ == '__main__':
     main()

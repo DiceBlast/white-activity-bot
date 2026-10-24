@@ -14,7 +14,7 @@ class ReleasePreflightTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertTrue(all(ok for ok, label in results if label.startswith('Python parse:')))
         self.assertEqual(
-            len([x for x in results if 'Current release notes: README_V403.txt' in x[1]]),
+            len([x for x in results if 'Current release notes: README.md' in x[1]]),
             1,
         )
 

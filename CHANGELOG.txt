@@ -1,3 +1,8 @@
+v4.1.0
+- Cleaned the Windows release: removed obsolete check-release, invite, and multi-window batch helpers, along with old version-specific readme files.
+- Added one current README.md and moved the Discord invite URL into SETUP.bat's guided setup flow.
+- Updated the safe upgrader to copy current GitHub update/rollback tools and remove obsolete files from existing installations.
+
 v4.0.13
 - Added CONNECT_GITHUB_UPDATES.bat for older extracted ZIP installations that were initialized without Git history. It makes a separate local backup of token/data/logs/backups before attaching the folder to the official GitHub repository.
 

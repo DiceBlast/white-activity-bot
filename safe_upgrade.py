@@ -20,18 +20,23 @@ CODE_FILES = (
     'alert_center.py', 'analytics_history.py', 'analytics_reports.py',
     'backup.py', 'backup_center.py', 'bot.py', 'bot_supervisor.py',
     'supervisor_storage.py', 'connection_health.py',
-    'commands.py', 'config_manager.py', 'customer_invite.py',
-    'customer_launch.py', 'customer_setup.py', 'dashboard_metrics.py',
+    'commands.py', 'config_manager.py', 'customer_launch.py',
+    'customer_setup.py', 'dashboard_metrics.py',
     'dashboard_preferences.py', 'database.py', 'discord_live_monitor.py',
     'event_logic.py', 'guild_dashboard.py', 'guild_log_parser.py',
     'logger.py', 'messages.py', 'multi_window_dashboard.py',
     'reward_loop.py', 'scheduler.py', 'setup_wizard.py', 'storage.py',
-    'voice.py', 'requirements.txt', 'INSTALL.bat', 'INVITE_BOT.bat',
-    'RUN_MULTI_WINDOWS.bat', 'SETUP.bat', 'START_BOT.bat',
-    'VERSION.txt', 'README_V403.txt', 'START_HERE_WINDOWS.txt',
-    'release_preflight.py', 'update_manager.py', 'CHECK_RELEASE.bat',
+    'voice.py', 'requirements.txt', 'INSTALL.bat', 'SETUP.bat', 'START_BOT.bat',
+    'UPGRADE_EXISTING.bat', 'CONNECT_GITHUB_UPDATES.bat',
+    'VERSION.txt', 'README.md', 'GITHUB_UPDATES.txt',
+    'release_preflight.py', 'update_manager.py', 'restart_after_update.py',
+    'connect_github_updates.py',
 )
-OBSOLETE_CODE_FILES = ('dota_test.py',)
+OBSOLETE_CODE_FILES = (
+    'dota_test.py', 'CHECK_RELEASE.bat', 'INVITE_BOT.bat',
+    'RUN_MULTI_WINDOWS.bat', 'README_V403.txt', 'START_HERE_WINDOWS.txt',
+    'customer_invite.py',
+)
 PROTECTED = ('data', 'backups', 'logs', '.venv', 'local_credentials.json',
              '.dashboard_preferences.json', '.bot_supervisor_status.json', 'runtime')
 
@@ -79,7 +84,7 @@ def run_upgrade(destination, source=ROOT):
             raise RuntimeError(f'Refusing to remove symlink: {filename}')
     snapshot_dir = destination / '.upgrade_code_backups'
     snapshot_dir.mkdir(exist_ok=True)
-    with tempfile.NamedTemporaryFile(prefix='pre_v403_', suffix='.zip', dir=snapshot_dir, delete=False) as temp:
+    with tempfile.NamedTemporaryFile(prefix='pre_v410_', suffix='.zip', dir=snapshot_dir, delete=False) as temp:
         snapshot = Path(temp.name)
     tracked_files = (*CODE_FILES, *OBSOLETE_CODE_FILES)
     previous = {name: (destination / name).read_bytes() if (destination / name).exists() else None for name in tracked_files}
@@ -122,7 +127,7 @@ def run_upgrade(destination, source=ROOT):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Safely install v4.0.13 code into an existing bot folder.')
+    parser = argparse.ArgumentParser(description='Safely install v4.1.0 code into an existing bot folder.')
     parser.add_argument('destination', type=Path, help='Existing Activity Rewards installation directory')
     args = parser.parse_args()
     snapshot = run_upgrade(args.destination)
