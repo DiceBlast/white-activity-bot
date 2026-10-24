@@ -122,7 +122,7 @@ def run_upgrade(destination, source=ROOT):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Safely install v4.0.12 code into an existing bot folder.')
+    parser = argparse.ArgumentParser(description='Safely install v4.0.13 code into an existing bot folder.')
     parser.add_argument('destination', type=Path, help='Existing Activity Rewards installation directory')
     args = parser.parse_args()
     snapshot = run_upgrade(args.destination)

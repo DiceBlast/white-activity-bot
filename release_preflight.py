@@ -36,7 +36,7 @@ def inspect_install(root=ROOT, check_dependencies=True):
 
 
 def main():
-    print('Activity Rewards v4.0.12 — read-only local preflight')
+    print('Activity Rewards v4.0.13 — read-only local preflight')
     print('No bot startup, Discord requests, or data modifications are performed.\n')
     findings = inspect_install()
     for passed, label in findings:

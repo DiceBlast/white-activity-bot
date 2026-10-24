@@ -1,3 +1,6 @@
+v4.0.13
+- Added CONNECT_GITHUB_UPDATES.bat for older extracted ZIP installations that were initialized without Git history. It makes a separate local backup of token/data/logs/backups before attaching the folder to the official GitHub repository.
+
 v4.0.12
 - Added local GitHub update history showing the last check, successful update, and rollback.
 - Added Rollback Last Update, which restores tracked source files to the version before the last GitHub update and restarts the app. Local token, points, databases, logs, backups, and preferences remain untouched.

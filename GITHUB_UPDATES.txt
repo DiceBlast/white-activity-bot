@@ -10,3 +10,8 @@ If the repository is public, no GitHub login is needed for updates.
 
 After INSTALL.bat and SETUP.bat, start the bot with START_BOT.bat. Settings >
 Updates > Update from GitHub will work without any additional Git setup.
+
+For an older extracted ZIP installation that says every file has local changes,
+use CONNECT_GITHUB_UPDATES.bat from a current release. It makes a separate
+backup of local token, points, logs, runtime files, and backups before it
+connects that old folder to this repository.
