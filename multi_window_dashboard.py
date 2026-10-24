@@ -355,8 +355,10 @@ class Dashboard:
         tabs = ttk.Notebook(popup)
         general_tab = tk.Frame(tabs, bg=BG)
         updates_tab = tk.Frame(tabs, bg=BG)
+        about_tab = tk.Frame(tabs, bg=BG)
         tabs.add(general_tab, text="General")
         tabs.add(updates_tab, text="Updates")
+        tabs.add(about_tab, text="About")
         tabs.pack(fill="both", expand=True, padx=18, pady=(0, 10))
         refresh = tk.StringVar(value=str(self.preferences["refresh_seconds"]))
         theme = tk.StringVar(value=self.preferences["theme"])
@@ -392,6 +394,24 @@ class Dashboard:
 
         modern_button(general_tab, "Save Preferences", save, "accent", side="left", padx=12, pady=8)
         self.build_updates_tab(updates_tab)
+        self.build_about_tab(about_tab)
+
+    def build_about_tab(self, tab):
+        """Show concise product, ownership, and safety information."""
+        tk.Label(tab, text="ABOUT ACTIVITY REWARDS", bg=BG, fg=TEXT,
+                 font=("Segoe UI", self.font_size + 2, "bold")).pack(anchor="w", padx=16, pady=(18, 8))
+        tk.Label(
+            tab,
+            text=(f"Version {current_version(ROOT)}\n\n"
+                  "Activity Rewards is a self-hosted Discord bot for voice activity, "
+                  "member rewards, events, and guild administration.\n\n"
+                  "Copyright © 2026 DiceBlast. All rights reserved.\n\n"
+                  "Disclaimer: This software is provided as is, without warranties. "
+                  "You are responsible for protecting your Discord token, keeping backups, "
+                  "and configuring rewards for your community. Activity Rewards is independent "
+                  "and is not affiliated with, endorsed by, or sponsored by Discord Inc."),
+            bg=BG, fg=MUTED, justify="left", anchor="nw", wraplength=560,
+        ).pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
     def build_updates_tab(self, tab):
         """Create operator-controlled update controls."""

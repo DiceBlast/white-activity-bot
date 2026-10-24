@@ -28,7 +28,7 @@ CODE_FILES = (
     'reward_loop.py', 'scheduler.py', 'setup_wizard.py', 'storage.py',
     'voice.py', 'requirements.txt', 'INSTALL.bat', 'SETUP.bat', 'START_BOT.bat',
     'UPGRADE_EXISTING.bat', 'CONNECT_GITHUB_UPDATES.bat',
-    'VERSION.txt', 'README.md', 'GITHUB_UPDATES.txt',
+    'VERSION.txt', 'README.md', 'COPYRIGHT.md', 'GITHUB_UPDATES.txt',
     'release_preflight.py', 'update_manager.py', 'restart_after_update.py',
     'release_installer.py',
     'connect_github_updates.py',

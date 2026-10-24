@@ -1,3 +1,7 @@
+v4.2.1
+- Added an About tab in Settings with product details, ownership, and an as-is disclaimer.
+- Added COPYRIGHT.md with the copyright notice and Discord independence disclaimer.
+
 v4.2.0
 - Added GitHub Release updates: no local Git install or cloned repository is needed for checking and installing published releases.
 - Release ZIPs are checksum-verified before download, program files are backed up before replacement, and the bot restarts automatically.
